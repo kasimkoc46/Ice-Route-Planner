@@ -1,0 +1,55 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bootstrap project files
+        shell: bash
+        run: |
+          if [ ! -d app ]; then
+            mkdir -p /tmp/ice-project
+            echo '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' | base64 -d > /tmp/ice-project.tar.gz
+            tar -xzf /tmp/ice-project.tar.gz -C /tmp/ice-project
+            cp -R /tmp/ice-project/. .
+          fi
+
+      - name: Commit project files
+        if: ${ '{' } !contains(github.event.head_commit.message, 'Bootstrap Android project') { '}' }
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app build.gradle.kts settings.gradle.kts gradle.properties README.md ROUTE_FLOW_V0.2.md
+          if ! git diff --cached --quiet; then
+            git commit -m "Bootstrap Android project"
+            git push
+          fi
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build debug APK
+        run: gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ice-Route-Planner-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
