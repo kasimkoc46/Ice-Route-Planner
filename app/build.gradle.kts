@@ -3,8 +3,28 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-android { namespace = "de.icekonig.routeplanner"; compileSdk = 35
-    defaultConfig { applicationId = "de.icekonig.routeplanner"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "0.1.0" }
+android {
+    namespace = "de.icekonig.routeplanner"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "de.icekonig.routeplanner"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 1
+        versionName = "0.1.0"
+
+        manifestPlaceholders["MAPS_API_KEY"] = ""
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
 }
 
 dependencies {
@@ -14,5 +34,3 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:19.0.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 }
-
-android { defaultConfig { manifestPlaceholders["MAPS_API_KEY"] = "" } }
