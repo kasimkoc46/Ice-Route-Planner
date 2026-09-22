@@ -28,7 +28,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app build.gradle.kts settings.gradle.kts gradle.properties README.md ROUTE_FLOW_V0.2.md
+          git add app build.gradle.kts settings.gradle.kts gradle.properties README.md
           if ! git diff --cached --quiet; then
             git commit -m "Bootstrap Android project"
             git push
