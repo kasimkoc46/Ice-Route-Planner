@@ -58,72 +58,74 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         loadCustomers()
+
         MapsInitializer.initialize(this)
 
-        createInterface(savedInstanceState)
+        buildScreen(savedInstanceState)
     }
 
-    private fun createInterface(savedInstanceState: Bundle?) {
+    private fun buildScreen(savedInstanceState: Bundle?) {
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setPadding(6.dp(), 4.dp(), 6.dp(), 4.dp())
+        root.setPadding(8, 4, 8, 4)
 
-        // =========================
-        // ÜST BİLGİ
-        // =========================
-
+        // Müşteri başlığı
         customerTitle = TextView(this)
         customerTitle.textSize = 17f
-        customerTitle.setPadding(6.dp(), 2.dp(), 6.dp(), 1.dp)
+        customerTitle.setPadding(4, 2, 4, 1)
 
+        // Müşteri bilgileri
         customerInfo = TextView(this)
         customerInfo.textSize = 13f
-        customerInfo.setPadding(6.dp(), 1.dp(), 6.dp(), 1.dp)
+        customerInfo.setPadding(4, 1, 4, 1)
 
+        // Durum
         statusText = TextView(this)
         statusText.textSize = 12f
-        statusText.setPadding(6.dp(), 1.dp(), 6.dp(), 3.dp)
+        statusText.setPadding(4, 1, 4, 3)
 
         root.addView(customerTitle)
-
         root.addView(customerInfo)
-
         root.addView(statusText)
 
-        // =========================
         // HARİTA
-        // =========================
-
         mapView = MapView(this)
 
-        root.addView(
-            mapView,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
+        val mapParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0
         )
+
+        mapParams.weight = 1f
+
+        root.addView(mapView, mapParams)
 
         mapView.onCreate(savedInstanceState)
 
-        // =========================
-        // BUTONLAR
-        // =========================
-
+        // 1. SATIR BUTONLAR
         val row1 = LinearLayout(this)
         row1.orientation = LinearLayout.HORIZONTAL
 
-        val addButton = createButton("+ Müşteri")
+        val addButton = Button(this)
+        addButton.text = "+ Müşteri"
+        addButton.textSize = 12f
+        addButton.minimumHeight = 0
+        addButton.minimumWidth = 0
+        addButton.setPadding(2, 0, 2, 0)
 
-        val nextButton = createButton("Sıradaki")
+        val nextButton = Button(this)
+        nextButton.text = "Sıradaki"
+        nextButton.textSize = 12f
+        nextButton.minimumHeight = 0
+        nextButton.minimumWidth = 0
+        nextButton.setPadding(2, 0, 2, 0)
 
         row1.addView(
             addButton,
             LinearLayout.LayoutParams(
                 0,
-                48.dp(),
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             )
         )
@@ -132,25 +134,36 @@ class MainActivity : AppCompatActivity() {
             nextButton,
             LinearLayout.LayoutParams(
                 0,
-                48.dp(),
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             )
         )
 
         root.addView(row1)
 
+        // 2. SATIR BUTONLAR
         val row2 = LinearLayout(this)
         row2.orientation = LinearLayout.HORIZONTAL
 
-        val navigateButton = createButton("Google Maps")
+        val mapsButton = Button(this)
+        mapsButton.text = "Google Maps"
+        mapsButton.textSize = 12f
+        mapsButton.minimumHeight = 0
+        mapsButton.minimumWidth = 0
+        mapsButton.setPadding(2, 0, 2, 0)
 
-        val deliveredButton = createButton("Teslim Edildi")
+        val deliveredButton = Button(this)
+        deliveredButton.text = "Teslim Edildi"
+        deliveredButton.textSize = 12f
+        deliveredButton.minimumHeight = 0
+        deliveredButton.minimumWidth = 0
+        deliveredButton.setPadding(2, 0, 2, 0)
 
         row2.addView(
-            navigateButton,
+            mapsButton,
             LinearLayout.LayoutParams(
                 0,
-                48.dp(),
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             )
         )
@@ -159,7 +172,7 @@ class MainActivity : AppCompatActivity() {
             deliveredButton,
             LinearLayout.LayoutParams(
                 0,
-                48.dp(),
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             )
         )
@@ -168,10 +181,7 @@ class MainActivity : AppCompatActivity() {
 
         setContentView(root)
 
-        // =========================
         // GOOGLE MAP
-        // =========================
-
         mapView.getMapAsync { map ->
 
             googleMap = map
@@ -179,112 +189,42 @@ class MainActivity : AppCompatActivity() {
             map.uiSettings.isZoomControlsEnabled = true
             map.uiSettings.isMyLocationButtonEnabled = true
 
-            if (
-                ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_FINE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED ||
-                ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-
-                map.isMyLocationEnabled = true
-
-                val locationClient =
-                    LocationServices.getFusedLocationProviderClient(this)
-
-                locationClient.lastLocation.addOnSuccessListener { location ->
-
-                    if (location != null && customers.isEmpty()) {
-
-                        map.moveCamera(
-                            CameraUpdateFactory.newLatLngZoom(
-                                LatLng(
-                                    location.latitude,
-                                    location.longitude
-                                ),
-                                11f
-                            )
-                        )
-
-                    } else {
-
-                        map.moveCamera(
-                            CameraUpdateFactory.newLatLngZoom(
-                                berlinDepot,
-                                11f
-                            )
-                        )
-                    }
-                }
-
-            } else {
-
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    ),
-                    100
-                )
-
-                map.moveCamera(
-                    CameraUpdateFactory.newLatLngZoom(
-                        berlinDepot,
-                        11f
-                    )
-                )
-            }
+            enableLocation()
 
             renderCustomers()
             renderCurrentCustomer()
+
+            map.setOnMarkerClickListener { marker ->
+
+                val id = marker.tag as? Long
+
+                if (id != null) {
+
+                    val index = customers.indexOfFirst {
+                        it.id == id
+                    }
+
+                    if (index >= 0) {
+                        currentIndex = index
+                        renderCurrentCustomer()
+                    }
+                }
+
+                false
+            }
         }
 
-        // =========================
         // BUTONLAR
-        // =========================
 
         addButton.setOnClickListener {
             showAddCustomerDialog()
         }
 
         nextButton.setOnClickListener {
-
-            if (customers.isEmpty()) {
-
-                Toast.makeText(
-                    this,
-                    "Önce müşteri ekleyin.",
-                    Toast.LENGTH_SHORT
-                ).show()
-
-                return@setOnClickListener
-            }
-
-            val next =
-                customers.indexOfFirst {
-                    !it.delivered && customers.indexOf(it) > currentIndex
-                }
-
-            if (next >= 0) {
-
-                currentIndex = next
-                renderCurrentCustomer()
-
-            } else {
-
-                Toast.makeText(
-                    this,
-                    "Başka bekleyen müşteri yok.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
+            goToNextCustomer()
         }
 
-        navigateButton.setOnClickListener {
+        mapsButton.setOnClickListener {
             openGoogleMaps()
         }
 
@@ -294,25 +234,72 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // BUTON OLUŞTUR
+    // KONUM
     // =========================================================
 
-    private fun createButton(text: String): Button {
+    private fun enableLocation() {
 
-        return Button(this).apply {
+        val fineGranted =
+            ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
 
-            this.text = text
-            textSize = 12f
+        val coarseGranted =
+            ActivityCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
 
-            minimumHeight = 0
-            minimumWidth = 0
+        if (!fineGranted && !coarseGranted) {
 
-            setPadding(
-                2.dp(),
-                0,
-                2.dp(),
-                0
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ),
+                100
             )
+
+            googleMap?.moveCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                    berlinDepot,
+                    11f
+                )
+            )
+
+            return
+        }
+
+        googleMap?.isMyLocationEnabled = true
+
+        val locationClient =
+            LocationServices.getFusedLocationProviderClient(this)
+
+        locationClient.lastLocation.addOnSuccessListener { location ->
+
+            if (location != null) {
+
+                googleMap?.moveCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        LatLng(
+                            location.latitude,
+                            location.longitude
+                        ),
+                        11f
+                    )
+                )
+
+            } else {
+
+                googleMap?.moveCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        berlinDepot,
+                        11f
+                    )
+                )
+            }
         }
     }
 
@@ -322,43 +309,32 @@ class MainActivity : AppCompatActivity() {
 
     private fun showAddCustomerDialog() {
 
-        val container = LinearLayout(this)
+        val box = LinearLayout(this)
+        box.orientation = LinearLayout.VERTICAL
+        box.setPadding(20, 4, 20, 4)
 
-        container.orientation = LinearLayout.VERTICAL
+        val name = EditText(this)
+        name.hint = "Müşteri adı"
 
-        container.setPadding(
-            20.dp(),
-            4.dp(),
-            20.dp(),
-            4.dp()
-        )
+        val address = EditText(this)
+        address.hint = "Tam teslimat adresi"
 
-        val nameInput = EditText(this)
-        nameInput.hint = "Müşteri adı"
-        nameInput.textSize = 15f
+        val phone = EditText(this)
+        phone.hint = "Telefon"
 
-        val addressInput = EditText(this)
-        addressInput.hint = "Tam teslimat adresi"
-        addressInput.textSize = 15f
+        val service = EditText(this)
+        service.hint = "Servis süresi (dakika)"
+        service.setText("10")
+        service.inputType = 2
 
-        val phoneInput = EditText(this)
-        phoneInput.hint = "Telefon"
-        phoneInput.textSize = 15f
-
-        val serviceInput = EditText(this)
-        serviceInput.hint = "Servis süresi (dakika)"
-        serviceInput.setText("10")
-        serviceInput.textSize = 15f
-        serviceInput.inputType = 2
-
-        container.addView(nameInput)
-        container.addView(addressInput)
-        container.addView(phoneInput)
-        container.addView(serviceInput)
+        box.addView(name)
+        box.addView(address)
+        box.addView(phone)
+        box.addView(service)
 
         val dialog = AlertDialog.Builder(this)
             .setTitle("Yeni Müşteri")
-            .setView(container)
+            .setView(box)
             .setNegativeButton("İptal", null)
             .setPositiveButton("Kaydet", null)
             .create()
@@ -369,44 +345,37 @@ class MainActivity : AppCompatActivity() {
                 AlertDialog.BUTTON_POSITIVE
             ).setOnClickListener {
 
-                val name =
-                    nameInput.text.toString().trim()
+                val customerName =
+                    name.text.toString().trim()
 
-                val address =
-                    addressInput.text.toString().trim()
+                val customerAddress =
+                    address.text.toString().trim()
 
-                val phone =
-                    phoneInput.text.toString().trim()
+                val customerPhone =
+                    phone.text.toString().trim()
 
-                val serviceMinutes =
-                    serviceInput.text
-                        .toString()
+                val minutes =
+                    service.text.toString()
                         .toIntOrNull()
                         ?: 10
 
-                if (name.isEmpty()) {
-
-                    nameInput.error =
-                        "Müşteri adı gerekli"
-
+                if (customerName.isEmpty()) {
+                    name.error = "Müşteri adı gerekli"
                     return@setOnClickListener
                 }
 
-                if (address.isEmpty()) {
-
-                    addressInput.error =
-                        "Adres gerekli"
-
+                if (customerAddress.isEmpty()) {
+                    address.error = "Adres gerekli"
                     return@setOnClickListener
                 }
 
                 dialog.dismiss()
 
-                geocodeAndSaveCustomer(
-                    name,
-                    address,
-                    phone,
-                    serviceMinutes
+                findAddress(
+                    customerName,
+                    customerAddress,
+                    customerPhone,
+                    minutes
                 )
             }
         }
@@ -415,14 +384,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // ADRESİ KOORDİNATA ÇEVİR
+    // ADRES ARAMA
     // =========================================================
 
-    private fun geocodeAndSaveCustomer(
+    private fun findAddress(
         name: String,
         address: String,
         phone: String,
-        serviceMinutes: Int
+        minutes: Int
     ) {
 
         Toast.makeText(
@@ -442,7 +411,7 @@ class MainActivity : AppCompatActivity() {
                     )
 
                 @Suppress("DEPRECATION")
-                val results =
+                val result =
                     geocoder.getFromLocationName(
                         address,
                         1
@@ -450,61 +419,55 @@ class MainActivity : AppCompatActivity() {
 
                 runOnUiThread {
 
-                    if (!results.isNullOrEmpty()) {
-
-                        val result =
-                            results[0]
-
-                        val customer =
-                            Customer(
-                                id = System.currentTimeMillis(),
-                                name = name,
-                                address = address,
-                                phone = phone,
-                                serviceMinutes =
-                                    serviceMinutes,
-                                latitude =
-                                    result.latitude,
-                                longitude =
-                                    result.longitude
-                            )
-
-                        customers.add(customer)
-
-                        saveCustomers()
-
-                        currentIndex =
-                            customers.lastIndex
-
-                        renderCustomers()
-
-                        renderCurrentCustomer()
-
-                        googleMap?.animateCamera(
-                            CameraUpdateFactory
-                                .newLatLngZoom(
-                                    LatLng(
-                                        customer.latitude,
-                                        customer.longitude
-                                    ),
-                                    15f
-                                )
-                        )
-
-                        Toast.makeText(
-                            this,
-                            "$name eklendi.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-
-                    } else {
+                    if (result.isNullOrEmpty()) {
 
                         Toast.makeText(
                             this,
                             "Adres bulunamadı.",
                             Toast.LENGTH_LONG
                         ).show()
+
+                        return@runOnUiThread
                     }
+
+                    val location = result[0]
+
+                    val customer =
+                        Customer(
+                            id = System.currentTimeMillis(),
+                            name = name,
+                            address = address,
+                            phone = phone,
+                            serviceMinutes = minutes,
+                            latitude = location.latitude,
+                            longitude = location.longitude
+                        )
+
+                    customers.add(customer)
+
+                    currentIndex =
+                        customers.lastIndex
+
+                    saveCustomers()
+
+                    renderCustomers()
+                    renderCurrentCustomer()
+
+                    googleMap?.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(
+                            LatLng(
+                                customer.latitude,
+                                customer.longitude
+                            ),
+                            15f
+                        )
+                    )
+
+                    Toast.makeText(
+                        this,
+                        "$name eklendi.",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
 
             } catch (e: Exception) {
@@ -522,7 +485,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // =========================================================
-    // MÜŞTERİLERİ HARİTAYA ÇİZ
+    // HARİTA MARKERLARI
     // =========================================================
 
     private fun renderCustomers() {
@@ -562,29 +525,6 @@ class MainActivity : AppCompatActivity() {
 
                 marker?.tag = customer.id
             }
-        }
-
-        map.setOnMarkerClickListener { marker ->
-
-            val id =
-                marker.tag as? Long
-
-            if (id != null) {
-
-                val index =
-                    customers.indexOfFirst {
-                        it.id == id
-                    }
-
-                if (index >= 0) {
-
-                    currentIndex = index
-
-                    renderCurrentCustomer()
-                }
-            }
-
-            false
         }
     }
 
@@ -635,15 +575,71 @@ class MainActivity : AppCompatActivity() {
         ) {
 
             googleMap?.animateCamera(
-                CameraUpdateFactory
-                    .newLatLngZoom(
-                        LatLng(
-                            customer.latitude,
-                            customer.longitude
-                        ),
-                        15f
-                    )
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(
+                        customer.latitude,
+                        customer.longitude
+                    ),
+                    15f
+                )
             )
+        }
+    }
+
+    // =========================================================
+    // SIRADAKİ MÜŞTERİ
+    // =========================================================
+
+    private fun goToNextCustomer() {
+
+        if (customers.isEmpty()) {
+
+            Toast.makeText(
+                this,
+                "Önce müşteri ekleyin.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        var nextIndex = currentIndex + 1
+
+        while (nextIndex < customers.size) {
+
+            if (!customers[nextIndex].delivered) {
+
+                currentIndex = nextIndex
+
+                renderCurrentCustomer()
+
+                return
+            }
+
+            nextIndex++
+        }
+
+        val firstPending =
+            customers.indexOfFirst {
+                !it.delivered
+            }
+
+        if (firstPending >= 0) {
+
+            currentIndex = firstPending
+
+            renderCurrentCustomer()
+
+        } else {
+
+            customerTitle.text =
+                "Tüm teslimatlar tamamlandı"
+
+            customerInfo.text =
+                "Bugünkü rota bitti."
+
+            statusText.text =
+                "Tüm müşteriler teslim edildi."
         }
     }
 
@@ -684,43 +680,11 @@ class MainActivity : AppCompatActivity() {
 
         renderCustomers()
 
-        moveToNextPendingCustomer()
-    }
-
-    private fun moveToNextPendingCustomer() {
-
-        val next =
-            customers.indexOfFirst {
-                !it.delivered
-            }
-
-        if (next >= 0) {
-
-            currentIndex = next
-
-            renderCurrentCustomer()
-
-            Toast.makeText(
-                this,
-                "Sıradaki müşteriye geçildi.",
-                Toast.LENGTH_SHORT
-            ).show()
-
-        } else {
-
-            customerTitle.text =
-                "Tüm teslimatlar tamamlandı"
-
-            customerInfo.text =
-                "Bugünkü rota bitti."
-
-            statusText.text =
-                "Tüm müşteriler teslim edildi."
-        }
+        goToNextCustomer()
     }
 
     // =========================================================
-    // GOOGLE MAPS NAVİGASYON
+    // GOOGLE MAPS
     // =========================================================
 
     private fun openGoogleMaps() {
@@ -739,25 +703,12 @@ class MainActivity : AppCompatActivity() {
         val customer =
             customers[currentIndex]
 
-        if (
-            customer.latitude == 0.0 ||
-            customer.longitude == 0.0
-        ) {
-
-            Toast.makeText(
-                this,
-                "Bu müşterinin konumu bulunamadı.",
-                Toast.LENGTH_SHORT
-            ).show()
-
-            return
-        }
-
         val uri =
             Uri.parse(
                 "google.navigation:q=" +
-                        "${customer.latitude}," +
-                        "${customer.longitude}"
+                        customer.latitude +
+                        "," +
+                        customer.longitude
             )
 
         val intent =
@@ -780,8 +731,9 @@ class MainActivity : AppCompatActivity() {
                 Uri.parse(
                     "https://www.google.com/maps/dir/?api=1" +
                             "&destination=" +
-                            "${customer.latitude}," +
-                            "${customer.longitude}"
+                            customer.latitude +
+                            "," +
+                            customer.longitude
                 )
 
             startActivity(
@@ -956,16 +908,5 @@ class MainActivity : AppCompatActivity() {
     ) {
         mapView.onSaveInstanceState(outState)
         super.onSaveInstanceState(outState)
-    }
-
-    // =========================================================
-    // DP
-    // =========================================================
-
-    private fun Int.dp(): Int {
-        return (
-            this *
-                resources.displayMetrics.density
-            ).toInt()
     }
 }
