@@ -8,8 +8,6 @@ import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.net.Uri
 import android.os.Bundle
-import android.view.Gravity
-import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -19,9 +17,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.MapsInitializer
-import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
 import org.json.JSONArray
@@ -60,41 +58,42 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         loadCustomers()
-
         MapsInitializer.initialize(this)
 
-        createUserInterface(savedInstanceState)
+        createInterface(savedInstanceState)
     }
 
-    private fun createUserInterface(savedInstanceState: Bundle?) {
+    private fun createInterface(savedInstanceState: Bundle?) {
 
         val root = LinearLayout(this)
         root.orientation = LinearLayout.VERTICAL
-        root.setPadding(12, 12, 12, 12)
+        root.setPadding(6.dp(), 4.dp(), 6.dp(), 4.dp())
 
-        // -------------------------
+        // =========================
         // ÜST BİLGİ
-        // -------------------------
+        // =========================
 
         customerTitle = TextView(this)
-        customerTitle.textSize = 20f
-        customerTitle.setPadding(8, 8, 8, 4)
+        customerTitle.textSize = 17f
+        customerTitle.setPadding(6.dp(), 2.dp(), 6.dp(), 1.dp)
 
         customerInfo = TextView(this)
-        customerInfo.textSize = 15f
-        customerInfo.setPadding(8, 4, 8, 8)
+        customerInfo.textSize = 13f
+        customerInfo.setPadding(6.dp(), 1.dp(), 6.dp(), 1.dp)
 
         statusText = TextView(this)
-        statusText.textSize = 14f
-        statusText.setPadding(8, 4, 8, 8)
+        statusText.textSize = 12f
+        statusText.setPadding(6.dp(), 1.dp(), 6.dp(), 3.dp)
 
         root.addView(customerTitle)
+
         root.addView(customerInfo)
+
         root.addView(statusText)
 
-        // -------------------------
+        // =========================
         // HARİTA
-        // -------------------------
+        // =========================
 
         mapView = MapView(this)
 
@@ -109,57 +108,69 @@ class MainActivity : AppCompatActivity() {
 
         mapView.onCreate(savedInstanceState)
 
-        // -------------------------
+        // =========================
         // BUTONLAR
-        // -------------------------
+        // =========================
 
-        val buttonRow1 = LinearLayout(this)
-        buttonRow1.orientation = LinearLayout.HORIZONTAL
+        val row1 = LinearLayout(this)
+        row1.orientation = LinearLayout.HORIZONTAL
 
-        val addButton = Button(this)
-        addButton.text = "+ Müşteri Ekle"
+        val addButton = createButton("+ Müşteri")
 
-        val nextButton = Button(this)
-        nextButton.text = "Sıradaki"
+        val nextButton = createButton("Sıradaki")
 
-        buttonRow1.addView(
+        row1.addView(
             addButton,
-            LinearLayout.LayoutParams(0, 55.dp(), 1f)
+            LinearLayout.LayoutParams(
+                0,
+                48.dp(),
+                1f
+            )
         )
 
-        buttonRow1.addView(
+        row1.addView(
             nextButton,
-            LinearLayout.LayoutParams(0, 55.dp(), 1f)
+            LinearLayout.LayoutParams(
+                0,
+                48.dp(),
+                1f
+            )
         )
 
-        root.addView(buttonRow1)
+        root.addView(row1)
 
-        val buttonRow2 = LinearLayout(this)
-        buttonRow2.orientation = LinearLayout.HORIZONTAL
+        val row2 = LinearLayout(this)
+        row2.orientation = LinearLayout.HORIZONTAL
 
-        val navigateButton = Button(this)
-        navigateButton.text = "🚗 Google Maps"
+        val navigateButton = createButton("Google Maps")
 
-        val deliveredButton = Button(this)
-        deliveredButton.text = "✅ Teslim Edildi"
+        val deliveredButton = createButton("Teslim Edildi")
 
-        buttonRow2.addView(
+        row2.addView(
             navigateButton,
-            LinearLayout.LayoutParams(0, 55.dp(), 1f)
+            LinearLayout.LayoutParams(
+                0,
+                48.dp(),
+                1f
+            )
         )
 
-        buttonRow2.addView(
+        row2.addView(
             deliveredButton,
-            LinearLayout.LayoutParams(0, 55.dp(), 1f)
+            LinearLayout.LayoutParams(
+                0,
+                48.dp(),
+                1f
+            )
         )
 
-        root.addView(buttonRow2)
+        root.addView(row2)
 
         setContentView(root)
 
-        // -------------------------
-        // MAP
-        // -------------------------
+        // =========================
+        // GOOGLE MAP
+        // =========================
 
         mapView.getMapAsync { map ->
 
@@ -178,16 +189,17 @@ class MainActivity : AppCompatActivity() {
                     Manifest.permission.ACCESS_COARSE_LOCATION
                 ) == PackageManager.PERMISSION_GRANTED
             ) {
-                googleMap?.isMyLocationEnabled = true
 
-                val fusedLocationClient =
+                map.isMyLocationEnabled = true
+
+                val locationClient =
                     LocationServices.getFusedLocationProviderClient(this)
 
-                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                locationClient.lastLocation.addOnSuccessListener { location ->
 
                     if (location != null && customers.isEmpty()) {
 
-                        googleMap?.moveCamera(
+                        map.moveCamera(
                             CameraUpdateFactory.newLatLngZoom(
                                 LatLng(
                                     location.latitude,
@@ -199,7 +211,7 @@ class MainActivity : AppCompatActivity() {
 
                     } else {
 
-                        googleMap?.moveCamera(
+                        map.moveCamera(
                             CameraUpdateFactory.newLatLngZoom(
                                 berlinDepot,
                                 11f
@@ -219,7 +231,7 @@ class MainActivity : AppCompatActivity() {
                     100
                 )
 
-                googleMap?.moveCamera(
+                map.moveCamera(
                     CameraUpdateFactory.newLatLngZoom(
                         berlinDepot,
                         11f
@@ -231,9 +243,9 @@ class MainActivity : AppCompatActivity() {
             renderCurrentCustomer()
         }
 
-        // -------------------------
+        // =========================
         // BUTONLAR
-        // -------------------------
+        // =========================
 
         addButton.setOnClickListener {
             showAddCustomerDialog()
@@ -242,21 +254,31 @@ class MainActivity : AppCompatActivity() {
         nextButton.setOnClickListener {
 
             if (customers.isEmpty()) {
+
                 Toast.makeText(
                     this,
                     "Önce müşteri ekleyin.",
                     Toast.LENGTH_SHORT
                 ).show()
+
                 return@setOnClickListener
             }
 
-            if (currentIndex < customers.size - 1) {
-                currentIndex++
+            val next =
+                customers.indexOfFirst {
+                    !it.delivered && customers.indexOf(it) > currentIndex
+                }
+
+            if (next >= 0) {
+
+                currentIndex = next
                 renderCurrentCustomer()
+
             } else {
+
                 Toast.makeText(
                     this,
-                    "Rotanın son müşterisindesiniz.",
+                    "Başka bekleyen müşteri yok.",
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -271,20 +293,679 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // ============================================================
+    // =========================================================
+    // BUTON OLUŞTUR
+    // =========================================================
+
+    private fun createButton(text: String): Button {
+
+        return Button(this).apply {
+
+            this.text = text
+            textSize = 12f
+
+            minimumHeight = 0
+            minimumWidth = 0
+
+            setPadding(
+                2.dp(),
+                0,
+                2.dp(),
+                0
+            )
+        }
+    }
+
+    // =========================================================
     // MÜŞTERİ EKLE
-    // ============================================================
+    // =========================================================
 
     private fun showAddCustomerDialog() {
 
         val container = LinearLayout(this)
+
         container.orientation = LinearLayout.VERTICAL
-        container.setPadding(30, 10, 30, 10)
+
+        container.setPadding(
+            20.dp(),
+            4.dp(),
+            20.dp(),
+            4.dp()
+        )
 
         val nameInput = EditText(this)
         nameInput.hint = "Müşteri adı"
+        nameInput.textSize = 15f
 
         val addressInput = EditText(this)
         addressInput.hint = "Tam teslimat adresi"
+        addressInput.textSize = 15f
 
-        val phoneInput
+        val phoneInput = EditText(this)
+        phoneInput.hint = "Telefon"
+        phoneInput.textSize = 15f
+
+        val serviceInput = EditText(this)
+        serviceInput.hint = "Servis süresi (dakika)"
+        serviceInput.setText("10")
+        serviceInput.textSize = 15f
+        serviceInput.inputType = 2
+
+        container.addView(nameInput)
+        container.addView(addressInput)
+        container.addView(phoneInput)
+        container.addView(serviceInput)
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Yeni Müşteri")
+            .setView(container)
+            .setNegativeButton("İptal", null)
+            .setPositiveButton("Kaydet", null)
+            .create()
+
+        dialog.setOnShowListener {
+
+            dialog.getButton(
+                AlertDialog.BUTTON_POSITIVE
+            ).setOnClickListener {
+
+                val name =
+                    nameInput.text.toString().trim()
+
+                val address =
+                    addressInput.text.toString().trim()
+
+                val phone =
+                    phoneInput.text.toString().trim()
+
+                val serviceMinutes =
+                    serviceInput.text
+                        .toString()
+                        .toIntOrNull()
+                        ?: 10
+
+                if (name.isEmpty()) {
+
+                    nameInput.error =
+                        "Müşteri adı gerekli"
+
+                    return@setOnClickListener
+                }
+
+                if (address.isEmpty()) {
+
+                    addressInput.error =
+                        "Adres gerekli"
+
+                    return@setOnClickListener
+                }
+
+                dialog.dismiss()
+
+                geocodeAndSaveCustomer(
+                    name,
+                    address,
+                    phone,
+                    serviceMinutes
+                )
+            }
+        }
+
+        dialog.show()
+    }
+
+    // =========================================================
+    // ADRESİ KOORDİNATA ÇEVİR
+    // =========================================================
+
+    private fun geocodeAndSaveCustomer(
+        name: String,
+        address: String,
+        phone: String,
+        serviceMinutes: Int
+    ) {
+
+        Toast.makeText(
+            this,
+            "Adres aranıyor...",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        Thread {
+
+            try {
+
+                val geocoder =
+                    Geocoder(
+                        this,
+                        Locale.GERMANY
+                    )
+
+                @Suppress("DEPRECATION")
+                val results =
+                    geocoder.getFromLocationName(
+                        address,
+                        1
+                    )
+
+                runOnUiThread {
+
+                    if (!results.isNullOrEmpty()) {
+
+                        val result =
+                            results[0]
+
+                        val customer =
+                            Customer(
+                                id = System.currentTimeMillis(),
+                                name = name,
+                                address = address,
+                                phone = phone,
+                                serviceMinutes =
+                                    serviceMinutes,
+                                latitude =
+                                    result.latitude,
+                                longitude =
+                                    result.longitude
+                            )
+
+                        customers.add(customer)
+
+                        saveCustomers()
+
+                        currentIndex =
+                            customers.lastIndex
+
+                        renderCustomers()
+
+                        renderCurrentCustomer()
+
+                        googleMap?.animateCamera(
+                            CameraUpdateFactory
+                                .newLatLngZoom(
+                                    LatLng(
+                                        customer.latitude,
+                                        customer.longitude
+                                    ),
+                                    15f
+                                )
+                        )
+
+                        Toast.makeText(
+                            this,
+                            "$name eklendi.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                    } else {
+
+                        Toast.makeText(
+                            this,
+                            "Adres bulunamadı.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+
+            } catch (e: Exception) {
+
+                runOnUiThread {
+
+                    Toast.makeText(
+                        this,
+                        "Adres aranırken hata oluştu.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }.start()
+    }
+
+    // =========================================================
+    // MÜŞTERİLERİ HARİTAYA ÇİZ
+    // =========================================================
+
+    private fun renderCustomers() {
+
+        val map = googleMap ?: return
+
+        map.clear()
+
+        customers.forEachIndexed { index, customer ->
+
+            if (
+                customer.latitude != 0.0 &&
+                customer.longitude != 0.0
+            ) {
+
+                val marker =
+                    map.addMarker(
+                        MarkerOptions()
+                            .position(
+                                LatLng(
+                                    customer.latitude,
+                                    customer.longitude
+                                )
+                            )
+                            .title(
+                                "${index + 1}. ${customer.name}"
+                            )
+                            .snippet(
+                                if (customer.delivered) {
+                                    "Teslim edildi"
+                                } else {
+                                    "${customer.address} • " +
+                                            "${customer.serviceMinutes} dk"
+                                }
+                            )
+                    )
+
+                marker?.tag = customer.id
+            }
+        }
+
+        map.setOnMarkerClickListener { marker ->
+
+            val id =
+                marker.tag as? Long
+
+            if (id != null) {
+
+                val index =
+                    customers.indexOfFirst {
+                        it.id == id
+                    }
+
+                if (index >= 0) {
+
+                    currentIndex = index
+
+                    renderCurrentCustomer()
+                }
+            }
+
+            false
+        }
+    }
+
+    // =========================================================
+    // MEVCUT MÜŞTERİ
+    // =========================================================
+
+    private fun renderCurrentCustomer() {
+
+        if (customers.isEmpty()) {
+
+            customerTitle.text =
+                "Bugünkü rota boş"
+
+            customerInfo.text =
+                "Yeni müşteri eklemek için + Müşteri"
+
+            statusText.text = ""
+
+            return
+        }
+
+        if (currentIndex >= customers.size) {
+            currentIndex = customers.lastIndex
+        }
+
+        val customer =
+            customers[currentIndex]
+
+        customerTitle.text =
+            "${currentIndex + 1}/${customers.size}  ${customer.name}"
+
+        customerInfo.text =
+            "${customer.address}\n" +
+                    "${customer.phone.ifEmpty { "-" }}  •  " +
+                    "${customer.serviceMinutes} dk"
+
+        statusText.text =
+            if (customer.delivered) {
+                "TESLİMAT TAMAMLANDI"
+            } else {
+                "TESLİMAT BEKLİYOR"
+            }
+
+        if (
+            customer.latitude != 0.0 &&
+            customer.longitude != 0.0
+        ) {
+
+            googleMap?.animateCamera(
+                CameraUpdateFactory
+                    .newLatLngZoom(
+                        LatLng(
+                            customer.latitude,
+                            customer.longitude
+                        ),
+                        15f
+                    )
+            )
+        }
+    }
+
+    // =========================================================
+    // TESLİM EDİLDİ
+    // =========================================================
+
+    private fun markCurrentDelivered() {
+
+        if (customers.isEmpty()) {
+
+            Toast.makeText(
+                this,
+                "Müşteri yok.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        val customer =
+            customers[currentIndex]
+
+        if (customer.delivered) {
+
+            Toast.makeText(
+                this,
+                "Bu müşteri zaten teslim edildi.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        customer.delivered = true
+
+        saveCustomers()
+
+        renderCustomers()
+
+        moveToNextPendingCustomer()
+    }
+
+    private fun moveToNextPendingCustomer() {
+
+        val next =
+            customers.indexOfFirst {
+                !it.delivered
+            }
+
+        if (next >= 0) {
+
+            currentIndex = next
+
+            renderCurrentCustomer()
+
+            Toast.makeText(
+                this,
+                "Sıradaki müşteriye geçildi.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+        } else {
+
+            customerTitle.text =
+                "Tüm teslimatlar tamamlandı"
+
+            customerInfo.text =
+                "Bugünkü rota bitti."
+
+            statusText.text =
+                "Tüm müşteriler teslim edildi."
+        }
+    }
+
+    // =========================================================
+    // GOOGLE MAPS NAVİGASYON
+    // =========================================================
+
+    private fun openGoogleMaps() {
+
+        if (customers.isEmpty()) {
+
+            Toast.makeText(
+                this,
+                "Önce müşteri ekleyin.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        val customer =
+            customers[currentIndex]
+
+        if (
+            customer.latitude == 0.0 ||
+            customer.longitude == 0.0
+        ) {
+
+            Toast.makeText(
+                this,
+                "Bu müşterinin konumu bulunamadı.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        val uri =
+            Uri.parse(
+                "google.navigation:q=" +
+                        "${customer.latitude}," +
+                        "${customer.longitude}"
+            )
+
+        val intent =
+            Intent(
+                Intent.ACTION_VIEW,
+                uri
+            )
+
+        intent.setPackage(
+            "com.google.android.apps.maps"
+        )
+
+        try {
+
+            startActivity(intent)
+
+        } catch (e: Exception) {
+
+            val webUri =
+                Uri.parse(
+                    "https://www.google.com/maps/dir/?api=1" +
+                            "&destination=" +
+                            "${customer.latitude}," +
+                            "${customer.longitude}"
+                )
+
+            startActivity(
+                Intent(
+                    Intent.ACTION_VIEW,
+                    webUri
+                )
+            )
+        }
+    }
+
+    // =========================================================
+    // KAYDET
+    // =========================================================
+
+    private fun saveCustomers() {
+
+        val array = JSONArray()
+
+        customers.forEach { customer ->
+
+            val obj = JSONObject()
+
+            obj.put("id", customer.id)
+            obj.put("name", customer.name)
+            obj.put("address", customer.address)
+            obj.put("phone", customer.phone)
+            obj.put(
+                "serviceMinutes",
+                customer.serviceMinutes
+            )
+            obj.put(
+                "latitude",
+                customer.latitude
+            )
+            obj.put(
+                "longitude",
+                customer.longitude
+            )
+            obj.put(
+                "delivered",
+                customer.delivered
+            )
+
+            array.put(obj)
+        }
+
+        getSharedPreferences(
+            prefsName,
+            Context.MODE_PRIVATE
+        )
+            .edit()
+            .putString(
+                customersKey,
+                array.toString()
+            )
+            .apply()
+    }
+
+    // =========================================================
+    // YÜKLE
+    // =========================================================
+
+    private fun loadCustomers() {
+
+        val json =
+            getSharedPreferences(
+                prefsName,
+                Context.MODE_PRIVATE
+            )
+                .getString(
+                    customersKey,
+                    null
+                )
+                ?: return
+
+        try {
+
+            val array =
+                JSONArray(json)
+
+            customers.clear()
+
+            for (i in 0 until array.length()) {
+
+                val obj =
+                    array.getJSONObject(i)
+
+                customers.add(
+                    Customer(
+                        id =
+                            obj.getLong("id"),
+
+                        name =
+                            obj.getString("name"),
+
+                        address =
+                            obj.getString("address"),
+
+                        phone =
+                            obj.optString("phone"),
+
+                        serviceMinutes =
+                            obj.optInt(
+                                "serviceMinutes",
+                                10
+                            ),
+
+                        latitude =
+                            obj.optDouble(
+                                "latitude",
+                                0.0
+                            ),
+
+                        longitude =
+                            obj.optDouble(
+                                "longitude",
+                                0.0
+                            ),
+
+                        delivered =
+                            obj.optBoolean(
+                                "delivered",
+                                false
+                            )
+                    )
+                )
+            }
+
+        } catch (e: Exception) {
+
+            customers.clear()
+        }
+    }
+
+    // =========================================================
+    // MAPVIEW YAŞAM DÖNGÜSÜ
+    // =========================================================
+
+    override fun onStart() {
+        super.onStart()
+        mapView.onStart()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        mapView.onResume()
+    }
+
+    override fun onPause() {
+        mapView.onPause()
+        super.onPause()
+    }
+
+    override fun onStop() {
+        mapView.onStop()
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        mapView.onDestroy()
+        super.onDestroy()
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        mapView.onLowMemory()
+    }
+
+    override fun onSaveInstanceState(
+        outState: Bundle
+    ) {
+        mapView.onSaveInstanceState(outState)
+        super.onSaveInstanceState(outState)
+    }
+
+    // =========================================================
+    // DP
+    // =========================================================
+
+    private fun Int.dp(): Int {
+        return (
+            this *
+                resources.displayMetrics.density
+            ).toInt()
+    }
+}
