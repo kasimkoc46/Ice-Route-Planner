@@ -1,20 +1,39 @@
 package de.icekonig.routeplanner
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.Gravity
+import android.view.View
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-
 import androidx.appcompat.app.AppCompatActivity
-
-import com.google.android.libraries.places.api.Places
-import com.google.android.libraries.places.api.model.Place
-import com.google.android.libraries.places.widget.Autocomplete
-import com.google.android.libraries.places.widget.model.AutocompleteActivityMode
+import org.json.JSONArray
+import java.net.HttpURLConnection
+import java.net.URLEncoder
+import java.net.URL
+import java.util.Locale
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 data class Stop(
+    val address: String,
+    val latitude: Double,
+    val longitude: Double,
+    var delivered: Boolean = false
+)
+
+data class SearchResult(
     val address: String,
     val latitude: Double,
     val longitude: Double
@@ -24,37 +43,31 @@ class MainActivity : AppCompatActivity() {
 
     private val stops = mutableListOf<Stop>()
 
-    private lateinit var addressButton: Button
-    private lateinit var stopList: TextView
+    private lateinit var searchInput: EditText
+    private lateinit var suggestionsLayout: LinearLayout
+    private lateinit var stopList: LinearLayout
     private lateinit var optimizeButton: Button
+    private lateinit var deliveryButton: Button
+    private lateinit var navigationButton: Button
+    private lateinit var webView: WebView
+    private lateinit var progressBar: ProgressBar
 
-    private val autocompleteRequestCode = 1001
+    private val executor: ExecutorService =
+        Executors.newSingleThreadExecutor()
+
+    private val handler = Handler(Looper.getMainLooper())
+
+    private var searchRunnable: Runnable? = null
+
+    private var currentStopIndex = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        /*
-         * Google Places başlatılıyor.
-         *
-         * API anahtarını daha sonra GitHub Secret üzerinden
-         * bağlayacağız.
-         */
-
-        val apiKey = ""
-
-        if (!Places.isInitialized()) {
-            Places.initialize(
-                applicationContext,
-                apiKey
-            )
-        }
-
         createScreen()
+        setupSearch()
+        updateScreen()
     }
-
-    // =========================================================
-    // ANA EKRAN
-    // =========================================================
 
     private fun createScreen() {
 
@@ -63,21 +76,24 @@ class MainActivity : AppCompatActivity() {
         root.orientation = LinearLayout.VERTICAL
 
         root.setPadding(
-            20,
-            20,
-            20,
+            16,
+            16,
+            16,
             12
         )
 
-        // -----------------------------------------------------
-        // BAŞLIK
-        // -----------------------------------------------------
-
         val title = TextView(this)
 
-        title.text = "ROTA OLUŞTUR"
+        title.text = "ICE ROUTE PLANNER"
 
-        title.textSize = 22f
+        title.textSize = 24f
+
+        title.setPadding(
+            4,
+            4,
+            4,
+            12
+        )
 
         root.addView(
             title,
@@ -87,42 +103,104 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        // -----------------------------------------------------
-        // ADRES ARAMA
-        // -----------------------------------------------------
+        // ------------------------------------------------
+        // MAP
+        // ------------------------------------------------
 
-        addressButton = Button(this)
+        webView = WebView(this)
 
-        addressButton.text = "🔍  İlk adresi ara"
+        webView.settings.javaScriptEnabled = true
+        webView.settings.domStorageEnabled = true
+        webView.settings.setGeolocationEnabled(true)
 
-        addressButton.textSize = 16f
+        webView.webViewClient = WebViewClient()
+
+        webView.loadDataWithBaseURL(
+            "https://localhost/",
+            createMapHtml(),
+            "text/html",
+            "UTF-8",
+            null
+        )
 
         root.addView(
-            addressButton,
+            webView,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                300
+            )
+        )
+
+        // ------------------------------------------------
+        // ADDRESS SEARCH
+        // ------------------------------------------------
+
+        searchInput = EditText(this)
+
+        searchInput.hint = "Adres yaz... örn. Sonnenallee 100"
+
+        searchInput.textSize = 16f
+
+        searchInput.setSingleLine(true)
+
+        searchInput.setPadding(
+            16,
+            12,
+            16,
+            12
+        )
+
+        root.addView(
+            searchInput,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         )
 
-        addressButton.setOnClickListener {
-            openAddressSearch()
-        }
+        // ------------------------------------------------
+        // LOADING
+        // ------------------------------------------------
 
-        // -----------------------------------------------------
-        // ADRES LİSTESİ
-        // -----------------------------------------------------
+        progressBar = ProgressBar(this)
 
-        stopList = TextView(this)
+        progressBar.visibility = View.GONE
 
-        stopList.textSize = 15f
-
-        stopList.setPadding(
-            4,
-            20,
-            4,
-            20
+        root.addView(
+            progressBar,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            }
         )
+
+        // ------------------------------------------------
+        // SUGGESTIONS
+        // ------------------------------------------------
+
+        suggestionsLayout = LinearLayout(this)
+
+        suggestionsLayout.orientation =
+            LinearLayout.VERTICAL
+
+        root.addView(
+            suggestionsLayout,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        // ------------------------------------------------
+        // STOP LIST
+        // ------------------------------------------------
+
+        stopList = LinearLayout(this)
+
+        stopList.orientation =
+            LinearLayout.VERTICAL
 
         root.addView(
             stopList,
@@ -133,17 +211,18 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        // -----------------------------------------------------
-        // ROTA OPTİMİZE BUTONU
-        // -----------------------------------------------------
+        // ------------------------------------------------
+        // OPTIMIZE
+        // ------------------------------------------------
 
         optimizeButton = Button(this)
 
-        optimizeButton.text = "🚀  ROTAYI OPTİMİZE ET"
+        optimizeButton.text =
+            "🚀 ROTAYI OPTİMİZE ET"
 
-        optimizeButton.textSize = 15f
-
-        optimizeButton.isEnabled = false
+        optimizeButton.setOnClickListener {
+            optimizeRoute()
+        }
 
         root.addView(
             optimizeButton,
@@ -153,192 +232,276 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        optimizeButton.setOnClickListener {
+        // ------------------------------------------------
+        // NAVIGATION
+        // ------------------------------------------------
 
-            if (stops.size < 2) {
+        navigationButton = Button(this)
 
-                Toast.makeText(
-                    this,
-                    "En az 2 adres ekleyin.",
-                    Toast.LENGTH_SHORT
-                ).show()
+        navigationButton.text =
+            "🧭 NAVİGASYONA GİT"
 
-                return@setOnClickListener
-            }
-
-            Toast.makeText(
-                this,
-                "${stops.size} adres hazır.",
-                Toast.LENGTH_SHORT
-            ).show()
+        navigationButton.setOnClickListener {
+            openNavigation()
         }
+
+        root.addView(
+            navigationButton,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        // ------------------------------------------------
+        // DELIVERED
+        // ------------------------------------------------
+
+        deliveryButton = Button(this)
+
+        deliveryButton.text =
+            "✅ TESLİM EDİLDİ"
+
+        deliveryButton.setOnClickListener {
+            markDelivered()
+        }
+
+        root.addView(
+            deliveryButton,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
 
         setContentView(root)
-
-        updateStopList()
     }
 
-    // =========================================================
-    // GOOGLE ADRES ARAMA
-    // =========================================================
+    // ====================================================
+    // SEARCH
+    // ====================================================
 
-    private fun openAddressSearch() {
+    private fun setupSearch() {
 
-        /*
-         * Places SDK 5.3.0 için güncel alanlar:
-         *
-         * FORMATTED_ADDRESS
-         * LOCATION
-         */
+        searchInput.addTextChangedListener(
+            object : TextWatcher {
 
-        val fields = listOf(
-            Place.Field.ID,
-            Place.Field.FORMATTED_ADDRESS,
-            Place.Field.LOCATION,
-            Place.Field.DISPLAY_NAME
-        )
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) {
+                }
 
-        val intent =
-            Autocomplete.IntentBuilder(
-                AutocompleteActivityMode.FULLSCREEN,
-                fields
-            )
-                .setCountries(
-                    listOf("DE")
-                )
-                .build(this)
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
 
-        startActivityForResult(
-            intent,
-            autocompleteRequestCode
+                    searchRunnable?.let {
+                        handler.removeCallbacks(it)
+                    }
+
+                    val text =
+                        s?.toString()?.trim() ?: ""
+
+                    if (text.length < 3) {
+
+                        suggestionsLayout.removeAllViews()
+
+                        return
+                    }
+
+                    searchRunnable = Runnable {
+
+                        searchPhoton(text)
+
+                    }
+
+                    handler.postDelayed(
+                        searchRunnable!!,
+                        350
+                    )
+                }
+
+                override fun afterTextChanged(
+                    s: Editable?
+                ) {
+                }
+            }
         )
     }
 
-    // =========================================================
-    // ADRES SEÇİLDİ
-    // =========================================================
+    // ====================================================
+    // PHOTON ADDRESS SEARCH
+    // ====================================================
 
-    @Deprecated("Deprecated in Android API")
-    override fun onActivityResult(
-        requestCode: Int,
-        resultCode: Int,
-        data: Intent?
+    private fun searchPhoton(
+        query: String
     ) {
 
-        super.onActivityResult(
-            requestCode,
-            resultCode,
-            data
-        )
+        runOnUiThread {
 
-        if (
-            requestCode !=
-            autocompleteRequestCode
-        ) {
-            return
+            progressBar.visibility =
+                View.VISIBLE
         }
 
-        if (
-            resultCode != RESULT_OK ||
-            data == null
-        ) {
-            return
-        }
+        executor.execute {
 
-        val place =
-            Autocomplete.getPlaceFromIntent(data)
+            try {
 
-        /*
-         * Places SDK 5.3.0:
-         *
-         * place.formattedAddress
-         * place.location
-         */
+                val encoded =
+                    URLEncoder.encode(
+                        query,
+                        "UTF-8"
+                    )
 
-        val address =
-            place.formattedAddress
+                val urlString =
+                    "https://photon.komoot.io/api/" +
+                            "?q=$encoded" +
+                            "&limit=8" +
+                            "&lang=de"
 
-        val location =
-            place.location
+                val connection =
+                    URL(urlString)
+                        .openConnection()
+                            as HttpURLConnection
 
-        if (
-            address == null ||
-            location == null
-        ) {
+                connection.requestMethod = "GET"
 
-            Toast.makeText(
-                this,
-                "Adres bilgisi alınamadı.",
-                Toast.LENGTH_SHORT
-            ).show()
+                connection.connectTimeout =
+                    10000
 
-            return
-        }
+                connection.readTimeout =
+                    10000
 
-        val newStop = Stop(
-            address = address,
-            latitude = location.latitude,
-            longitude = location.longitude
-        )
+                val response =
+                    connection.inputStream
+                        .bufferedReader()
+                        .use {
+                            it.readText()
+                        }
 
-        stops.add(newStop)
+                connection.disconnect()
 
-        updateStopList()
+                val json =
+                    JSONArray(
+                        org.json.JSONObject(response)
+                            .getJSONArray("features")
+                            .toString()
+                    )
 
-        /*
-         * Kullanıcının istediği Spoke tarzı akış:
-         *
-         * Adres seçildi
-         * ↓
-         * Listeye eklendi
-         * ↓
-         * Otomatik olarak yeni adres arama ekranı açılır
-         */
+                val results =
+                    mutableListOf<SearchResult>()
 
-        openAddressSearch()
-    }
+                for (i in 0 until json.length()) {
 
-    // =========================================================
-    // ADRES LİSTESİNİ GÜNCELLE
-    // =========================================================
+                    val feature =
+                        json.getJSONObject(i)
 
-    private fun updateStopList() {
+                    val properties =
+                        feature.getJSONObject(
+                            "properties"
+                        )
 
-        if (stops.isEmpty()) {
+                    val geometry =
+                        feature.getJSONObject(
+                            "geometry"
+                        )
 
-            stopList.text =
-                "Henüz adres eklenmedi.\n\n" +
-                "İlk adresi aramak için yukarıdaki butona bas."
+                    val coordinates =
+                        geometry.getJSONArray(
+                            "coordinates"
+                        )
 
-            optimizeButton.isEnabled = false
+                    val longitude =
+                        coordinates.getDouble(0)
 
-            addressButton.text =
-                "🔍  İlk adresi ara"
+                    val latitude =
+                        coordinates.getDouble(1)
 
-            return
-        }
+                    val name =
+                        properties.optString(
+                            "name",
+                            ""
+                        )
 
-        val text =
-            StringBuilder()
+                    val street =
+                        properties.optString(
+                            "street",
+                            ""
+                        )
 
-        text.append(
-            "${stops.size} TESLİMAT\n\n"
-        )
+                    val houseNumber =
+                        properties.optString(
+                            "housenumber",
+                            ""
+                        )
 
-        stops.forEachIndexed { index, stop ->
+                    val postcode =
+                        properties.optString(
+                            "postcode",
+                            ""
+                        )
 
-            text.append(
-                "${index + 1}. ${stop.address}\n\n"
-            )
-        }
+                    val city =
+                        properties.optString(
+                            "city",
+                            ""
+                        )
 
-        stopList.text =
-            text.toString()
+                    val parts =
+                        listOf(
+                            name,
+                            street +
+                                    if (
+                                        houseNumber.isNotBlank()
+                                    ) {
+                                        " $houseNumber"
+                                    } else {
+                                        ""
+                                    },
+                            postcode,
+                            city
+                        ).filter {
+                            it.isNotBlank()
+                        }
 
-        optimizeButton.isEnabled =
-            stops.size >= 2
+                    val address =
+                        parts.joinToString(
+                            ", "
+                        )
 
-        addressButton.text =
-            "🔍  Sonraki adresi ara"
-    }
-}
+                    if (
+                        address.isNotBlank()
+                    ) {
+
+                        results.add(
+                            SearchResult(
+                                address,
+                                latitude,
+                                longitude
+                            )
+                        )
+                    }
+                }
+
+                runOnUiThread {
+
+                    progressBar.visibility =
+                        View.GONE
+
+                    showSuggestions(results)
+                }
+
+            } catch (e: Exception) {
+
+                runOnUiThread {
+
+                    progressBar.visibility =
+                        View.GONE
+
+                    suggestions
