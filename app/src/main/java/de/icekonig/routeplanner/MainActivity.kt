@@ -504,4 +504,755 @@ class MainActivity : AppCompatActivity() {
                     progressBar.visibility =
                         View.GONE
 
-                    suggestions
+                    suggestionsLayout.removeAllViews()
+
+                    Toast.makeText(
+                        this,
+                        "Adres arama hatası",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
+    // ====================================================
+    // SUGGESTIONS
+    // ====================================================
+
+    private fun showSuggestions(
+        results: List<SearchResult>
+    ) {
+
+        suggestionsLayout.removeAllViews()
+
+        for (result in results) {
+
+            val button =
+                Button(this)
+
+            button.text =
+                result.address
+
+            button.textSize =
+                14f
+
+            button.gravity =
+                Gravity.START or Gravity.CENTER_VERTICAL
+
+            button.setOnClickListener {
+
+                addStop(result)
+
+            }
+
+            suggestionsLayout.addView(
+                button,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+    }
+
+    // ====================================================
+    // ADD STOP
+    // ====================================================
+
+    private fun addStop(
+        result: SearchResult
+    ) {
+
+        stops.add(
+            Stop(
+                address =
+                    result.address,
+                latitude =
+                    result.latitude,
+                longitude =
+                    result.longitude
+            )
+        )
+
+        searchInput.text.clear()
+
+        suggestionsLayout.removeAllViews()
+
+        currentStopIndex =
+            if (stops.size == 1) {
+                0
+            } else {
+                currentStopIndex
+            }
+
+        updateScreen()
+
+        showStopsOnMap()
+    }
+
+    // ====================================================
+    // SCREEN
+    // ====================================================
+
+    private fun updateScreen() {
+
+        stopList.removeAllViews()
+
+        if (stops.isEmpty()) {
+
+            val empty =
+                TextView(this)
+
+            empty.text =
+                "Adresleri yukarıdaki kutuya yaz.\n\n" +
+                        "3 harften sonra adres önerileri gelir."
+
+            empty.textSize =
+                16f
+
+            empty.setPadding(
+                8,
+                20,
+                8,
+                20
+            )
+
+            stopList.addView(
+                empty
+            )
+
+            optimizeButton.isEnabled =
+                false
+
+            navigationButton.isEnabled =
+                false
+
+            deliveryButton.isEnabled =
+                false
+
+            return
+        }
+
+        for (
+            index in stops.indices
+        ) {
+
+            val stop =
+                stops[index]
+
+            val row =
+                TextView(this)
+
+            val status =
+                if (stop.delivered) {
+                    "✅"
+                } else if (
+                    index == currentStopIndex
+                ) {
+                    "➡️"
+                } else {
+                    "⬜"
+                }
+
+            row.text =
+                "$status ${index + 1}. ${stop.address}"
+
+            row.textSize =
+                15f
+
+            row.setPadding(
+                8,
+                10,
+                8,
+                10
+            )
+
+            stopList.addView(
+                row
+            )
+        }
+
+        optimizeButton.isEnabled =
+            stops.size >= 2
+
+        navigationButton.isEnabled =
+            stops.isNotEmpty() &&
+                    currentStopIndex < stops.size
+
+        deliveryButton.isEnabled =
+            stops.isNotEmpty() &&
+                    currentStopIndex < stops.size &&
+                    !stops[currentStopIndex].delivered
+    }
+
+    // ====================================================
+    // ROUTE OPTIMIZATION
+    // ====================================================
+
+    private fun optimizeRoute() {
+
+        if (stops.size < 2) {
+
+            Toast.makeText(
+                this,
+                "En az 2 adres gerekli.",
+                Toast.LENGTH_SHORT
+            ).show()
+
+            return
+        }
+
+        optimizeButton.isEnabled =
+            false
+
+        progressBar.visibility =
+            View.VISIBLE
+
+        executor.execute {
+
+            try {
+
+                val coordinates =
+                    stops.joinToString(";") {
+
+                        "${it.longitude},${it.latitude}"
+                    }
+
+                val urlString =
+                    "https://router.project-osrm.org/" +
+                            "trip/v1/driving/" +
+                            coordinates +
+                            "?source=first" +
+                            "&destination=last" +
+                            "&roundtrip=false" +
+                            "&steps=false" +
+                            "&overview=full" +
+                            "&geometries=geojson"
+
+                val connection =
+                    URL(urlString)
+                        .openConnection()
+                            as HttpURLConnection
+
+                connection.requestMethod =
+                    "GET"
+
+                connection.connectTimeout =
+                    15000
+
+                connection.readTimeout =
+                    15000
+
+                val response =
+                    connection.inputStream
+                        .bufferedReader()
+                        .use {
+                            it.readText()
+                        }
+
+                connection.disconnect()
+
+                val json =
+                    org.json.JSONObject(
+                        response
+                    )
+
+                val code =
+                    json.optString(
+                        "code"
+                    )
+
+                if (code != "Ok") {
+
+                    throw Exception(
+                        "OSRM: $code"
+                    )
+                }
+
+                val waypoints =
+                    json.getJSONArray(
+                        "waypoints"
+                    )
+
+                val ordered =
+                    mutableListOf<Pair<Int, Int>>()
+
+                for (
+                    i in 0 until waypoints.length()
+                ) {
+
+                    val waypoint =
+                        waypoints.getJSONObject(
+                            i
+                        )
+
+                    val inputIndex =
+                        waypoint.getInt(
+                            "waypoint_index"
+                        )
+
+                    val tripsIndex =
+                        waypoint.getInt(
+                            "trips_index"
+                        )
+
+                    ordered.add(
+                        Pair(
+                            tripsIndex,
+                            inputIndex
+                        )
+                    )
+                }
+
+                val newOrder =
+                    waypoints
+                        .let {
+
+                            val list =
+                                mutableListOf<Pair<Int, Stop>>()
+
+                            for (
+                                i in 0 until it.length()
+                            ) {
+
+                                val waypoint =
+                                    it.getJSONObject(i)
+
+                                val originalIndex =
+                                    waypoint.getInt(
+                                        "waypoint_index"
+                                    )
+
+                                val routeIndex =
+                                    waypoint.getInt(
+                                        "trips_index"
+                                    )
+
+                                list.add(
+                                    Pair(
+                                        routeIndex,
+                                        stops[originalIndex]
+                                    )
+                                )
+                            }
+
+                            list.sortedBy {
+                                it.first
+                            }.map {
+                                it.second
+                            }
+                        }
+
+                runOnUiThread {
+
+                    stops.clear()
+
+                    stops.addAll(
+                        newOrder
+                    )
+
+                    currentStopIndex = 0
+
+                    progressBar.visibility =
+                        View.GONE
+
+                    optimizeButton.isEnabled =
+                        true
+
+                    updateScreen()
+
+                    showOptimizedRoute(
+                        json
+                    )
+
+                    Toast.makeText(
+                        this,
+                        "Rota optimize edildi.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+
+            } catch (e: Exception) {
+
+                runOnUiThread {
+
+                    progressBar.visibility =
+                        View.GONE
+
+                    optimizeButton.isEnabled =
+                        true
+
+                    Toast.makeText(
+                        this,
+                        "Rota oluşturulamadı.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    // ====================================================
+    // MAP
+    // ====================================================
+
+    private fun showStopsOnMap() {
+
+        if (stops.isEmpty()) {
+            return
+        }
+
+        val points =
+            stops.joinToString(",") {
+
+                "[${it.latitude},${it.longitude}]"
+            }
+
+        val javascript =
+            "setStops([$points]);"
+
+        webView.evaluateJavascript(
+            javascript,
+            null
+        )
+    }
+
+    private fun showOptimizedRoute(
+        json: org.json.JSONObject
+    ) {
+
+        try {
+
+            val trips =
+                json.getJSONArray(
+                    "trips"
+                )
+
+            if (trips.length() == 0) {
+                showStopsOnMap()
+                return
+            }
+
+            val trip =
+                trips.getJSONObject(0)
+
+            val geometry =
+                trip.getJSONObject(
+                    "geometry"
+                )
+
+            val coordinates =
+                geometry.getJSONArray(
+                    "coordinates"
+                )
+
+            val route =
+                StringBuilder()
+
+            for (
+                i in 0 until coordinates.length()
+            ) {
+
+                val point =
+                    coordinates.getJSONArray(i)
+
+                val longitude =
+                    point.getDouble(0)
+
+                val latitude =
+                    point.getDouble(1)
+
+                if (route.isNotEmpty()) {
+                    route.append(",")
+                }
+
+                route.append(
+                    "[$latitude,$longitude]"
+                )
+            }
+
+            val points =
+                stops.joinToString(",") {
+
+                    "[${it.latitude},${it.longitude}]"
+                }
+
+            val javascript =
+                "setRoute([$points],[$route]);"
+
+            webView.evaluateJavascript(
+                javascript,
+                null
+            )
+
+        } catch (e: Exception) {
+
+            showStopsOnMap()
+        }
+    }
+
+    // ====================================================
+    // NAVIGATION
+    // ====================================================
+
+    private fun openNavigation() {
+
+        if (
+            stops.isEmpty() ||
+            currentStopIndex >= stops.size
+        ) {
+            return
+        }
+
+        val stop =
+            stops[currentStopIndex]
+
+        val uri =
+            Uri.parse(
+                "geo:${stop.latitude}," +
+                        "${stop.longitude}" +
+                        "?q=${Uri.encode(stop.address)}"
+            )
+
+        val intent =
+            Intent(
+                Intent.ACTION_VIEW,
+                uri
+            )
+
+        try {
+
+            startActivity(intent)
+
+        } catch (e: Exception) {
+
+            Toast.makeText(
+                this,
+                "Navigasyon uygulaması bulunamadı.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    // ====================================================
+    // DELIVERED
+    // ====================================================
+
+    private fun markDelivered() {
+
+        if (
+            currentStopIndex >= stops.size
+        ) {
+            return
+        }
+
+        stops[currentStopIndex]
+            .delivered = true
+
+        if (
+            currentStopIndex <
+            stops.size - 1
+        ) {
+
+            currentStopIndex++
+        }
+
+        updateScreen()
+
+        showStopsOnMap()
+
+        if (
+            currentStopIndex >= stops.size - 1 &&
+            stops.last().delivered
+        ) {
+
+            Toast.makeText(
+                this,
+                "Tüm teslimatlar tamamlandı.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    // ====================================================
+    // MAP HTML
+    // ====================================================
+
+    private fun createMapHtml(): String {
+
+        return """
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta name="viewport"
+      content="width=device-width,
+      initial-scale=1.0,
+      maximum-scale=1.0,
+      user-scalable=no">
+
+<link rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+</script>
+
+<style>
+
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div id="map"></div>
+
+<script>
+
+var map = L.map('map').setView(
+    [52.52, 13.405],
+    11
+);
+
+L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {
+        maxZoom: 19,
+        attribution:
+        '&copy; OpenStreetMap contributors'
+    }
+).addTo(map);
+
+var markers = [];
+
+var routeLine = null;
+
+function clearMarkers() {
+
+    markers.forEach(
+        function(marker) {
+            map.removeLayer(marker);
+        }
+    );
+
+    markers = [];
+}
+
+function setStops(points) {
+
+    clearMarkers();
+
+    if (!points || points.length === 0) {
+        return;
+    }
+
+    var bounds = [];
+
+    points.forEach(
+        function(point, index) {
+
+            var marker =
+                L.marker(point)
+                .addTo(map)
+                .bindPopup(
+                    '<b>Stop ' +
+                    (index + 1) +
+                    '</b>'
+                );
+
+            markers.push(marker);
+
+            bounds.push(point);
+        }
+    );
+
+    map.fitBounds(bounds, {
+        padding: [30, 30]
+    });
+}
+
+function setRoute(points, route) {
+
+    clearMarkers();
+
+    if (routeLine) {
+        map.removeLayer(routeLine);
+        routeLine = null;
+    }
+
+    if (!points || points.length === 0) {
+        return;
+    }
+
+    var bounds = [];
+
+    points.forEach(
+        function(point, index) {
+
+            var marker =
+                L.marker(point)
+                .addTo(map)
+                .bindPopup(
+                    '<b>' +
+                    (index + 1) +
+                    '</b>'
+                );
+
+            markers.push(marker);
+
+            bounds.push(point);
+        }
+    );
+
+    if (route && route.length > 0) {
+
+        routeLine =
+            L.polyline(
+                route,
+                {
+                    weight: 5
+                }
+            ).addTo(map);
+
+        bounds =
+            bounds.concat(route);
+    }
+
+    map.fitBounds(bounds, {
+        padding: [30, 30]
+    });
+}
+
+</script>
+
+</body>
+</html>
+        """.trimIndent()
+    }
+
+    override fun onDestroy() {
+
+        searchRunnable?.let {
+            handler.removeCallbacks(it)
+        }
+
+        executor.shutdownNow()
+
+        webView.destroy()
+
+        super.onDestroy()
+    }
+}
