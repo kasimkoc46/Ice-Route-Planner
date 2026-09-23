@@ -6,6 +6,7 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+
 import androidx.appcompat.app.AppCompatActivity
 
 import com.google.android.libraries.places.api.Places
@@ -32,11 +33,17 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Google Places başlat
+        /*
+         * Google Places başlatılıyor.
+         *
+         * API anahtarını daha sonra GitHub Secret üzerinden
+         * bağlayacağız.
+         */
+
         val apiKey = ""
 
         if (!Places.isInitialized()) {
-            Places.initializeWithNewPlacesApiEnabled(
+            Places.initialize(
                 applicationContext,
                 apiKey
             )
@@ -44,6 +51,10 @@ class MainActivity : AppCompatActivity() {
 
         createScreen()
     }
+
+    // =========================================================
+    // ANA EKRAN
+    // =========================================================
 
     private fun createScreen() {
 
@@ -58,9 +69,9 @@ class MainActivity : AppCompatActivity() {
             12
         )
 
-        // --------------------------------
+        // -----------------------------------------------------
         // BAŞLIK
-        // --------------------------------
+        // -----------------------------------------------------
 
         val title = TextView(this)
 
@@ -76,9 +87,9 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        // --------------------------------
+        // -----------------------------------------------------
         // ADRES ARAMA
-        // --------------------------------
+        // -----------------------------------------------------
 
         addressButton = Button(this)
 
@@ -98,9 +109,9 @@ class MainActivity : AppCompatActivity() {
             openAddressSearch()
         }
 
-        // --------------------------------
+        // -----------------------------------------------------
         // ADRES LİSTESİ
-        // --------------------------------
+        // -----------------------------------------------------
 
         stopList = TextView(this)
 
@@ -122,9 +133,9 @@ class MainActivity : AppCompatActivity() {
             )
         )
 
-        // --------------------------------
-        // ROTA OPTİMİZE
-        // --------------------------------
+        // -----------------------------------------------------
+        // ROTA OPTİMİZE BUTONU
+        // -----------------------------------------------------
 
         optimizeButton = Button(this)
 
@@ -157,7 +168,7 @@ class MainActivity : AppCompatActivity() {
 
             Toast.makeText(
                 this,
-                "${stops.size} adres hazır. Rota optimizasyonu yapılacak.",
+                "${stops.size} adres hazır.",
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -173,11 +184,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun openAddressSearch() {
 
+        /*
+         * Places SDK 5.3.0 için güncel alanlar:
+         *
+         * FORMATTED_ADDRESS
+         * LOCATION
+         */
+
         val fields = listOf(
             Place.Field.ID,
-            Place.Field.ADDRESS,
-            Place.Field.LAT_LNG,
-            Place.Field.NAME
+            Place.Field.FORMATTED_ADDRESS,
+            Place.Field.LOCATION,
+            Place.Field.DISPLAY_NAME
         )
 
         val intent =
@@ -185,7 +203,9 @@ class MainActivity : AppCompatActivity() {
                 AutocompleteActivityMode.FULLSCREEN,
                 fields
             )
-                .setCountries(listOf("DE"))
+                .setCountries(
+                    listOf("DE")
+                )
                 .build(this)
 
         startActivityForResult(
@@ -211,48 +231,75 @@ class MainActivity : AppCompatActivity() {
             data
         )
 
-        if (requestCode != autocompleteRequestCode) {
+        if (
+            requestCode !=
+            autocompleteRequestCode
+        ) {
             return
         }
 
         if (
-            resultCode == RESULT_OK &&
-            data != null
+            resultCode != RESULT_OK ||
+            data == null
+        ) {
+            return
+        }
+
+        val place =
+            Autocomplete.getPlaceFromIntent(data)
+
+        /*
+         * Places SDK 5.3.0:
+         *
+         * place.formattedAddress
+         * place.location
+         */
+
+        val address =
+            place.formattedAddress
+
+        val location =
+            place.location
+
+        if (
+            address == null ||
+            location == null
         ) {
 
-            val place =
-                Autocomplete.getPlaceFromIntent(data)
+            Toast.makeText(
+                this,
+                "Adres bilgisi alınamadı.",
+                Toast.LENGTH_SHORT
+            ).show()
 
-            val address = place.address
-            val location = place.latLng
-
-            if (
-                address != null &&
-                location != null
-            ) {
-
-                val latitude = location.latitude
-                val longitude = location.longitude
-
-                val newStop = Stop(
-                    address = address,
-                    latitude = latitude,
-                    longitude = longitude
-                )
-
-                stops.add(newStop)
-
-                updateStopList()
-
-                // Adres seçildikten sonra
-                // otomatik olarak yeni adres arama ekranı açılır.
-                openAddressSearch()
-            }
+            return
         }
+
+        val newStop = Stop(
+            address = address,
+            latitude = location.latitude,
+            longitude = location.longitude
+        )
+
+        stops.add(newStop)
+
+        updateStopList()
+
+        /*
+         * Kullanıcının istediği Spoke tarzı akış:
+         *
+         * Adres seçildi
+         * ↓
+         * Listeye eklendi
+         * ↓
+         * Otomatik olarak yeni adres arama ekranı açılır
+         */
+
+        openAddressSearch()
     }
 
     // =========================================================
-    // ADRES LİSTESİ
+    // ADRES LİSTESİNİ GÜNCELLE
     // =========================================================
 
     private fun updateStopList() {
@@ -271,7 +318,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val text = StringBuilder()
+        val text =
+            StringBuilder()
 
         text.append(
             "${stops.size} TESLİMAT\n\n"
@@ -280,25 +328,12 @@ class MainActivity : AppCompatActivity() {
         stops.forEachIndexed { index, stop ->
 
             text.append(
-                "${index + 1}. ${stop.address}\n"
-            )
-
-            text.append(
-                "   Koordinat: ${
-                    String.format(
-                        "%.6f",
-                        stop.latitude
-                    )
-                }, ${
-                    String.format(
-                        "%.6f",
-                        stop.longitude
-                    )
-                }\n\n"
+                "${index + 1}. ${stop.address}\n\n"
             )
         }
 
-        stopList.text = text.toString()
+        stopList.text =
+            text.toString()
 
         optimizeButton.isEnabled =
             stops.size >= 2
