@@ -32,11 +32,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        /*
-         * Google Places başlat
-         *
-         * API key daha sonra GitHub Secret üzerinden bağlanacak.
-         */
+        // Google Places başlat
         val apiKey = ""
 
         if (!Places.isInitialized()) {
@@ -81,7 +77,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         // --------------------------------
-        // ADRES ARAMA BUTONU
+        // ADRES ARAMA
         // --------------------------------
 
         addressButton = Button(this)
@@ -127,7 +123,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         // --------------------------------
-        // ROTAYI OPTİMİZE ET
+        // ROTA OPTİMİZE
         // --------------------------------
 
         optimizeButton = Button(this)
@@ -161,7 +157,7 @@ class MainActivity : AppCompatActivity() {
 
             Toast.makeText(
                 this,
-                "Rota optimizasyonu bir sonraki adımda.",
+                "${stops.size} adres hazır. Rota optimizasyonu yapılacak.",
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -215,60 +211,48 @@ class MainActivity : AppCompatActivity() {
             data
         )
 
-        if (
-            requestCode !=
-            autocompleteRequestCode
-        ) {
+        if (requestCode != autocompleteRequestCode) {
             return
         }
 
         if (
-            resultCode ==
-            RESULT_OK &&
+            resultCode == RESULT_OK &&
             data != null
         ) {
 
             val place =
-                Autocomplete
-                    .getPlaceFromIntent(data)
+                Autocomplete.getPlaceFromIntent(data)
 
-            val address =
-                place.address
-
-            val latLng =
-                place.latLng
+            val address = place.address
+            val location = place.latLng
 
             if (
                 address != null &&
-                latLng != null
+                location != null
             ) {
 
-                stops.add(
-                    Stop(
-                        address = address,
-                        latitude =
-                            latLng.latitude,
-                        longitude =
-                            latLng.longitude
-                    )
+                val latitude = location.latitude
+                val longitude = location.longitude
+
+                val newStop = Stop(
+                    address = address,
+                    latitude = latitude,
+                    longitude = longitude
                 )
+
+                stops.add(newStop)
 
                 updateStopList()
 
-                /*
-                 * EN ÖNEMLİ KISIM:
-                 *
-                 * Adres seçildiği anda
-                 * tekrar arama ekranını açıyoruz.
-                 */
-
+                // Adres seçildikten sonra
+                // otomatik olarak yeni adres arama ekranı açılır.
                 openAddressSearch()
             }
         }
     }
 
     // =========================================================
-    // LİSTEYİ GÜNCELLE
+    // ADRES LİSTESİ
     // =========================================================
 
     private fun updateStopList() {
@@ -290,13 +274,27 @@ class MainActivity : AppCompatActivity() {
         val text = StringBuilder()
 
         text.append(
-            "${stops.size} teslimat\n\n"
+            "${stops.size} TESLİMAT\n\n"
         )
 
         stops.forEachIndexed { index, stop ->
 
             text.append(
-                "${index + 1}. ${stop.address}\n\n"
+                "${index + 1}. ${stop.address}\n"
+            )
+
+            text.append(
+                "   Koordinat: ${
+                    String.format(
+                        "%.6f",
+                        stop.latitude
+                    )
+                }, ${
+                    String.format(
+                        "%.6f",
+                        stop.longitude
+                    )
+                }\n\n"
             )
         }
 
